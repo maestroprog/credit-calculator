@@ -34,7 +34,7 @@ class Calculator
             $currentMonth = $this->period->getFrom()->modify($i . ' month');
             $percentMonthAmount = $percentYearAmount / 365 * $currentMonth->format('t'); // проценты набежавшие за месяц
 
-            $payment = min($monthlyPay, $credit);
+            $payment = min($monthlyPay, $credit + $percentMonthAmount);
 
             $paymentObject = new Payment(
                 clone $currentMonth,
@@ -71,7 +71,7 @@ class Calculator
             $currentMonth = $paymentPeriod->getFrom()->modify($i . ' month');
             $percentMonthAmount = $percentYearAmount / 365 * $currentMonth->format('t'); // проценты набежавшие за месяц
 
-            $payment = min($monthlyPay, $credit);
+            $payment = min($monthlyPay, $credit + $percentMonthAmount);
 
             $paymentObject = new Payment(
                 clone $currentMonth,
@@ -148,6 +148,12 @@ class Calculator
             $result = ($amount + $credit) / $period;
         } else {
             $result = min($amount / $period, $remainingCredit);
+        }
+
+        if ($result > 10000) {
+            $result = (floor($result / 1000) * 1000);
+        } elseif ($result > 1000) {
+            $result = (floor($result / 100) * 100);
         }
 
         return $result;
