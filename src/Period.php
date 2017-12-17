@@ -2,6 +2,8 @@
 
 namespace Maestroprog\CreditCalculator;
 
+use Composer\Installer\PearInstaller;
+
 class Period
 {
     const MONTH_SECONDS = 2592000;
@@ -12,7 +14,7 @@ class Period
     public function __construct(\DateTimeImmutable $from, \DateTimeImmutable $to)
     {
         $this->from = $from;
-        $this->to   = $to;
+        $this->to = $to;
     }
 
     public function getFrom(): \DateTimeImmutable
@@ -25,8 +27,14 @@ class Period
         return $this->to;
     }
 
-    public function getMonthCount(): int
+    /**
+     * @return \Generator|Period[]
+     */
+    public function each(): \Generator
     {
-        return ceil(($this->to->getTimestamp() - $this->from->getTimestamp()) / self::MONTH_SECONDS);
+        $current = $this->from;
+        while ($current < $this->to) {
+            yield new self($current, $current = $current->modify('1 month'));
+        }
     }
 }

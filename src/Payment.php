@@ -14,7 +14,8 @@ class Payment
         float $amount,
         float $percentAmount,
         float $debtRepaymentAmount
-    ) {
+    )
+    {
         $this->date = $date;
         $this->amount = $amount;
         $this->percentAmount = $percentAmount;
