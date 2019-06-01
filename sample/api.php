@@ -21,13 +21,13 @@ $perMonth1 = (float)($_GET['per-month'] ?? 70000);
 $calculator = new Calculator(
     $amount,
     $percent,
-    new Period(
+    $mainPeriod = new Period(
         new \DateTimeImmutable(),
         new \DateTimeImmutable($period . ' month')
     )
 );
 
-$minimalPayment = $calculator->getMinimalPayment($credit, $period, $percent);
+$minimalPayment = $calculator->getMinimalPayment($credit, $mainPeriod);
 $paymentSchedule = $calculator->paymentSchedule($perMonth1);
 foreach ($paymentSchedule->getPayments() as $payment) {
     $result['payments'][] = [

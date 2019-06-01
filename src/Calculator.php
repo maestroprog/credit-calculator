@@ -37,9 +37,12 @@ class Calculator
             $percentMonthAmount = $percentYearAmount / 365 *
                 ($nextMonth->getTimestamp() - $currentMonth->getTimestamp()) / 86400; // проценты набежавшие за месяц
 
+            $percentMonthAmount = round($percentMonthAmount, 2);
+
             $payment = min($monthlyPay, $credit + $percentMonthAmount);
 
             $paymentObject = new Payment(
+                $currentMonth,
                 $nextMonth,
                 $payment,
                 $percentMonthAmount,
@@ -66,6 +69,8 @@ class Calculator
     {
         $period = new PaymentPeriod();
         $credit = $this->credit;
+        $daysInYear = date('L') ? 366 : 365;
+        $daysInYear = 365;
         foreach ($paymentPeriod->each() as $nextPeriod) {
             if ($credit <= 0) {
                 break;
@@ -74,20 +79,18 @@ class Calculator
             $percentYearAmount = $credit * $this->percent / 100; // проценты набежавшие за год
             $currentMonth = $nextPeriod->getFrom();
             $nextMonth = $nextPeriod->getTo();
-            $percentMonthAmount = $percentYearAmount / 365 *
-                ($nextMonth->getTimestamp() - $currentMonth->getTimestamp()) / 86400; // проценты набежавшие за месяц
-
+            $days = ($nextMonth->getTimestamp() - $currentMonth->getTimestamp()) / 86400;
+            $percentMonthAmount = $percentYearAmount / $daysInYear * $days; // проценты набежавшие за месяц
             $payment = min($monthlyPay, $credit + $percentMonthAmount);
-
             $paymentObject = new Payment(
+                $currentMonth,
                 $nextMonth,
                 $payment,
                 $percentMonthAmount,
-                $payment - $percentMonthAmount
+                $payment - $percentMonthAmount,
+                $days
             );
-
             $credit -= ($payment - $percentMonthAmount); // вычитаем из суммы долга платеж без учета процентов
-
             $period->addPayment($paymentObject);
         }
 
@@ -116,54 +119,24 @@ class Calculator
         return $this->credit;
     }
 
-    public function getMinimalPayment($credit, $period, $percent): float
+    public function getMinimalPayment($credit, Period $period): float
     {
-        $remainingCredit = $credit;
-        $percentTotalAmount = 0;
-        $amount = 0;
-        for ($i = $period; $i > 0; $i--) {
-            $percentYearAmount = $credit * $percent / 100; // процент который набежит за год
-            $currentMonth = $this->period->getFrom()->modify(($period - $i) . ' month');
-            $nextMonth = $currentMonth->modify('1 month');
-            $percentMonthAmount = $percentYearAmount / 365 *
-                ($nextMonth->getTimestamp() - $currentMonth->getTimestamp()) / 86400; // проценты набежавшие за месяц
-            $percentTotalAmount += $percentMonthAmount;
+        $monthlyPayment = round($credit / $period->getMonthCount() / 100) * 100;
+        do {
+            $monthlyPayment += 100;
 
-            $result = ($credit + $percentTotalAmount) / $period; // кол-во денег, которое придется платить весь период
-            $amount += $result;
-        }
+            $remainingCredit = $credit;
+            foreach ($period->each() as $nextPeriod) {
+                $percentYearAmount = $remainingCredit * $this->percent / 100; // проценты набежавшие за год
+                $currentMonth = $nextPeriod->getFrom();
+                $nextMonth = $nextPeriod->getTo();
+                $percentMonthAmount = $percentYearAmount / 365 *
+                    ($nextMonth->getTimestamp() - $currentMonth->getTimestamp()) / 86400; // проценты набежавшие за месяц
+                $remainingCredit -= max(0, $monthlyPayment - $percentMonthAmount);
+            }
 
-        $preResult = $amount / $period;
+        } while ($remainingCredit > 0);
 
-        $amount = 0;
-
-        // корректировка с учётом получившегося промежуточного минимального платежа
-        $percentTotalAmount = 0;
-        for ($i = $period; $i > 0; $i--) {
-            $percentYearAmount = $credit * $percent / 100; // процент который набежит за год
-            $currentMonth = $this->period->getFrom()->modify(($period - $i) . ' month');
-            $nextMonth = $currentMonth->modify('1 month');
-            $percentMonthAmount = $percentYearAmount / 365 *
-                ($nextMonth->getTimestamp() - $currentMonth->getTimestamp()) / 86400; // проценты набежавшие за месяц
-            $percentTotalAmount += $percentMonthAmount;
-
-            $perMonth = $preResult - $percentMonthAmount;
-            $credit -= $perMonth;
-            $amount += $preResult;
-        }
-
-        if ($credit > 0) {
-            $result = ($amount + $credit) / $period;
-        } else {
-            $result = min($amount / $period, $remainingCredit);
-        }
-
-        if ($result > 10000) {
-            $result = (floor($result / 1000) * 1000);
-        } elseif ($result > 1000) {
-            $result = (floor($result / 100) * 100);
-        }
-
-        return $result;
+        return $monthlyPayment;
     }
 }
