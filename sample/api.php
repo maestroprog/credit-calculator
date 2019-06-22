@@ -24,7 +24,8 @@ $calculator = new Calculator(
     $mainPeriod = new Period(
         new \DateTimeImmutable(),
         new \DateTimeImmutable($period . ' month')
-    )
+    ),
+    new \Maestroprog\CreditCalculator\CreditOptions(0)
 );
 
 $minimalPayment = $calculator->getMinimalPayment($credit, $mainPeriod);

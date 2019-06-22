@@ -75,7 +75,7 @@ class Period
 
     public function getMonthCount(): int
     {
-        return round(($this->to->getTimestamp() - $this->from->getTimestamp()) / self::MONTH_SECONDS);
+        return floor(($this->to->getTimestamp() - $this->from->getTimestamp()) / self::MONTH_SECONDS);
     }
 
     public function __toString()

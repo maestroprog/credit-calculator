@@ -7,12 +7,16 @@ class Calculator
     private $credit;
     private $percent;
     private $period;
+    private $creditOptions;
+    private $interestFreeDays;
 
-    public function __construct(int $credit, float $percent, Period $period)
+    public function __construct(int $credit, float $percent, Period $period, CreditOptions $creditOptions)
     {
         $this->credit = $credit;
         $this->percent = $percent;
         $this->period = $period;
+        $this->creditOptions = $creditOptions;
+        $this->interestFreeDays = $this->creditOptions->getInterestFreeDays();
     }
 
     /**
@@ -34,8 +38,12 @@ class Calculator
             $percentYearAmount = $credit * $this->percent / 100; // проценты набежавшие за год
             $currentMonth = $nextPeriod->getFrom();
             $nextMonth = $nextPeriod->getTo();
-            $percentMonthAmount = $percentYearAmount / 365 *
-                ($nextMonth->getTimestamp() - $currentMonth->getTimestamp()) / 86400; // проценты набежавшие за месяц
+            $days = ($nextMonth->getTimestamp() - $currentMonth->getTimestamp()) / 86400;
+            $daysWithoutPercent = min($days, $this->interestFreeDays);
+            $this->interestFreeDays -= $daysWithoutPercent;
+            $days -= $daysWithoutPercent;
+
+            $percentMonthAmount = $percentYearAmount / 365 * $days; // проценты набежавшие за месяц
 
             $percentMonthAmount = round($percentMonthAmount, 2);
 
@@ -80,6 +88,10 @@ class Calculator
             $currentMonth = $nextPeriod->getFrom();
             $nextMonth = $nextPeriod->getTo();
             $days = ($nextMonth->getTimestamp() - $currentMonth->getTimestamp()) / 86400;
+            $daysWithoutPercent = min($days, $this->interestFreeDays);
+            $this->interestFreeDays -= $daysWithoutPercent;
+            $days -= $daysWithoutPercent;
+
             $percentMonthAmount = $percentYearAmount / $daysInYear * $days; // проценты набежавшие за месяц
             $payment = min($monthlyPay, $credit + $percentMonthAmount);
             $paymentObject = new Payment(
@@ -121,22 +133,12 @@ class Calculator
 
     public function getMinimalPayment($credit, Period $period): float
     {
-        $monthlyPayment = round($credit / $period->getMonthCount() / 100) * 100;
-        do {
-            $monthlyPayment += 100;
+        $rate = $this->percent / 100;
 
-            $remainingCredit = $credit;
-            foreach ($period->each() as $nextPeriod) {
-                $percentYearAmount = $remainingCredit * $this->percent / 100; // проценты набежавшие за год
-                $currentMonth = $nextPeriod->getFrom();
-                $nextMonth = $nextPeriod->getTo();
-                $percentMonthAmount = $percentYearAmount / 365 *
-                    ($nextMonth->getTimestamp() - $currentMonth->getTimestamp()) / 86400; // проценты набежавшие за месяц
-                $remainingCredit -= max(0, $monthlyPayment - $percentMonthAmount);
-            }
+        $minimalPayment = round($credit * $rate / (12 * (1 - (1 + $rate / 12) ** -$period->getMonthCount())));
 
-        } while ($remainingCredit > 0);
+        $i = 10 ** (strlen($minimalPayment) - 2);
 
-        return $monthlyPayment;
+        return round($minimalPayment / $i) * $i;
     }
 }
