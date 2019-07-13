@@ -9,6 +9,7 @@ class Period
     private $from;
     private $to;
     private $continueFrom;
+    private $payFrom;
 
     public function __construct(\DateTimeImmutable $from, \DateTimeImmutable $to, \DateTimeImmutable $continueFrom = null)
     {
@@ -27,26 +28,45 @@ class Period
         return $this->to;
     }
 
+    public function getPayFrom(): \DateTimeImmutable
+    {
+        return $this->payFrom;
+    }
+
+    public function setPayFrom(?\DateTimeImmutable $payFrom)
+    {
+        $this->payFrom = $payFrom;
+
+        return $this;
+    }
+
     /**
      * @return \Generator|Period[]
      */
     public function each(): \Generator
     {
-        $baseDate = (int)$this->from->format('d');
+        $baseDate = $this->from;
+        $baseDay = (int)($this->payFrom ?? $this->from)->format('d');
         $current = $this->continueFrom ?? $this->from;
-        $currentNormal = $this->from;
+        $currentNormal = $baseDate;
         $prev = $current;
         while ($current < $this->to) {
-            $year = (int)$currentNormal->format('Y');
-            $month = (int)$currentNormal->format('m');
+            if ($this->payFrom) {
+                $next = clone $this->payFrom;
 
-            if ($month === 12) {
-                $year++;
-                $month = 0;
+                $year = (int)$next->format('Y');
+                $month = (int)$next->format('m');
+            } else {
+                $year = (int)$currentNormal->format('Y');
+                $month = (int)$currentNormal->format('m');
+
+                if ($month === 12) {
+                    $year++;
+                    $month = 0;
+                }
+                $month = $month + 1;
+                $next = new \DateTimeImmutable(sprintf('%04d-%02d-%02d', $year, $month, $baseDay));
             }
-            $month = $month + 1;
-
-            $next = new \DateTimeImmutable(sprintf('%04d-%02d-%02d', $year, $month, $baseDate));
             if ((int)$next->format('m') !== ($month)) {
                 $next = $next->modify('-1 day');
             }
@@ -57,7 +77,7 @@ class Period
                 throw new \LogicException('LOGIC error!');
             }
             $nextNormal = $next;
-            if ((int)$next->format('d') < $baseDate) {
+            if ((int)$next->format('d') < $baseDay) {
                 $next->modify('1 day');
             }
 
@@ -65,7 +85,8 @@ class Period
             if ($day >= 7 || ($day >= 6 && cal_days_in_month(CAL_GREGORIAN, $month, $year) > 29)) {
                 $next = $next->modify((8 - $day) . ' day');
             }
-            yield new self($current, $next);
+            yield (new self($current, $next));
+            $this->payFrom = null;
 
             $prev = $current;
             $currentNormal = $nextNormal;
